@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Agno AI Chat</title>
+  <style>
+    body { font-family: Arial; background: #f4f6f8; }
+    #chat { width: 400px; margin: 40px auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #ccc; padding: 16px; }
+    #messages { height: 300px; overflow-y: auto; border: 1px solid #eee; margin-bottom: 12px; padding: 8px; }
+    .msg { margin: 4px 0; }
+    .ai { color: blue; }
+    .user { color: green; }
+  </style>
+</head>
+<body>
+  <div id="chat">
+    <h2>Agno AI Chat</h2>
+    <div id="messages"></div>
+    <input id="input" type="text" placeholder="Nhập tin nhắn..." style="width:70%">
+    <button onclick="sendMsg()">Gửi</button>
+  </div>
+  <script>
+    const messages = document.getElementById('messages');
+    function addMsg(from, text) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + from;
+      div.textContent = (from === 'user' ? 'Bạn: ' : 'AI: ') + text;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
+    async function sendMsg() {
+      const input = document.getElementById('input');
+      const text = input.value.trim();
+      if (!text) return;
+      addMsg('user', text);
+      input.value = '';
+      // Gửi tới backend FastAPI
+      const res = await fetch('/api/chat/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, session_id: 'demo-session' })
+      });
+      const data = await res.json();
+      addMsg('ai', data.response);
+    }
+  </script>
+</body>
+</html>
