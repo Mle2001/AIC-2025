@@ -30,7 +30,8 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Agno AI Backend")
     setup_middleware(app)
     setup_routes(app)
-    static_dir = os.path.join(os.path.dirname(__file__), 'static')
+    # Sử dụng static folder là build/dist của frontend
+    static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist'))
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
     return app
 
