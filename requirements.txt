@@ -1,0 +1,47 @@
+# This file is compatible with 'pip install -r requirements.txt'
+
+# --- Agno Framework & Core ---
+agno
+fastapi
+uvicorn
+pydantic
+
+# --- LLM & Embedding Models ---
+openai
+anthropic
+sentence-transformers
+torch
+transformers
+Pillow
+
+# --- Video & Audio Processing ---
+opencv-python
+scenedetect[opencv]
+moviepy
+openai-whisper
+easyocr
+
+# --- Databases & Storage ---
+lancedb
+neo4j
+asyncpg
+sqlalchemy[asyncio]
+redis[hiredis]
+
+# --- Utilities ---
+python-multipart
+python-jose[cryptography]
+passlib[bcrypt]
+python-dotenv
+httpx
+beautifulsoup4
+requests
+
+# --- Monitoring ---
+prometheus-client
+
+# --- Testing Framework ---
+pytest
+pytest-mock
+pytest-cov
+pytest-asyncio
