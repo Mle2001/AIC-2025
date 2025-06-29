@@ -1,6 +1,7 @@
 # /tools/video_processing/audio_processing.py
 """
-Tool cho audio processing và speech-to-text, tuân thủ kiến trúc Agno.
+Tool cho audio processing và speech-to-text sử dụng Whisper, tuân thủ kiến trúc Agno.
+Công cụ này được duy trì để sử dụng song song hoặc làm phương án dự phòng.
 """
 import logging
 from pathlib import Path
@@ -19,12 +20,11 @@ logger = logging.getLogger(__name__)
 
 class AudioProcessingTool:
     """
-    Một class chứa các công cụ để trích xuất và phân tích âm thanh từ video.
+    Một class chứa các công cụ để trích xuất và phân tích âm thanh từ video bằng Whisper.
     """
     def __init__(self, whisper_model_name: str = "base"):
         """
         Khởi tạo tool và tải mô hình Whisper.
-        Sử dụng một thuộc tính được cache để chỉ tải mô hình một lần.
         """
         self._whisper_model_name = whisper_model_name
         self._model = None
@@ -33,7 +33,6 @@ class AudioProcessingTool:
     def whisper_model(self):
         """
         Sử dụng property để tải mô hình một cách lười biếng (lazy loading).
-        Mô hình chỉ được tải khi được truy cập lần đầu tiên.
         """
         if self._model is None:
             logger.info(f"Đang tải mô hình Whisper: '{self._whisper_model_name}'...")
@@ -42,13 +41,12 @@ class AudioProcessingTool:
                 logger.info("Tải mô hình Whisper thành công.")
             except Exception as e:
                 logger.error(f"Lỗi khi tải mô hình Whisper '{self._whisper_model_name}': {e}", exc_info=True)
-                # Ném ra lỗi để agent có thể biết và xử lý
                 raise RuntimeError(f"Không thể tải mô hình Whisper: {e}")
         return self._model
 
     @tool(
-        name="transcribe_audio",
-        description="Trích xuất âm thanh từ một đoạn video và chuyển đổi nó thành văn bản.",
+        name="transcribe_audio_legacy",
+        description="Trích xuất âm thanh từ video và chuyển đổi thành văn bản bằng Whisper.",
         cache_results=True,
         cache_ttl=7200
     )
@@ -58,22 +56,19 @@ class AudioProcessingTool:
 
         Args:
             video_path (str): Đường dẫn đến tệp video nguồn.
-            audio_output_path (str): Đường dẫn để lưu tệp âm thanh được trích xuất (ví dụ: ./artifacts/audio/audio.mp3).
+            audio_output_path (str): Đường dẫn để lưu tệp âm thanh được trích xuất.
 
         Returns:
-            Optional[Dict[str, Any]]: Một dictionary chứa kết quả từ Whisper (văn bản, các đoạn, ngôn ngữ),
-                                      hoặc None nếu video không có âm thanh.
+            Optional[Dict[str, Any]]: Kết quả từ Whisper, hoặc None nếu không có âm thanh.
         """
-        logger.info(f"Bắt đầu xử lý âm thanh cho video: {video_path}")
+        logger.info(f"Bắt đầu xử lý âm thanh (legacy) cho video: {video_path}")
         
-        # Bước 1: Trích xuất âm thanh
         audio_path = self._extract_audio(video_path, audio_output_path)
         
         if not audio_path:
-            logger.warning(f"Video {video_path} không có âm thanh hoặc không thể trích xuất. Bỏ qua bước chuyển đổi.")
+            logger.warning(f"Video {video_path} không có âm thanh. Bỏ qua chuyển đổi.")
             return None
 
-        # Bước 2: Chuyển đổi âm thanh thành văn bản
         logger.info(f"Bắt đầu chuyển đổi văn bản cho tệp âm thanh: {audio_path}")
         try:
             result = self.whisper_model.transcribe(audio_path, fp16=False)
@@ -84,13 +79,9 @@ class AudioProcessingTool:
             raise e
 
     def _extract_audio(self, video_path: str, output_path: str) -> Optional[str]:
-        """
-        Hàm tiện ích nội bộ để trích xuất âm thanh. Không phải là một tool.
-        """
+        """Hàm tiện ích nội bộ để trích xuất âm thanh."""
         video_file = Path(video_path)
         audio_file = Path(output_path)
-        
-        # Tạo thư mục cha nếu chưa có
         audio_file.parent.mkdir(parents=True, exist_ok=True)
 
         if not video_file.exists():
@@ -105,26 +96,3 @@ class AudioProcessingTool:
         except Exception as e:
             logger.error(f"Lỗi khi trích xuất âm thanh từ '{video_file.name}': {e}", exc_info=True)
             raise e
-
-    @tool(
-        name="extract_audio_features",
-        description="Trích xuất các đặc trưng âm thanh từ một tệp video (chức năng giả định)."
-    )
-    def extract_audio_features(self, video_path: str) -> Dict[str, Any]:
-        """
-        Tool này là một placeholder để thể hiện khả năng mở rộng trong tương lai,
-        ví dụ như phân loại âm thanh (tiếng vỗ tay, nhạc nền) hoặc nhận dạng người nói.
-
-        Args:
-            video_path (str): Đường dẫn đến tệp video.
-
-        Returns:
-            Dict[str, Any]: Một dict chứa các đặc trưng âm thanh giả định.
-        """
-        logger.info(f"Đang trích xuất các đặc trưng âm thanh giả định cho: {video_path}")
-        # Logic giả định
-        return {
-            "has_music": True,
-            "background_noise_level": "low",
-            "detected_events": ["speech", "music"]
-        }

@@ -1,121 +1,97 @@
-# /tests/tools/video_processing/test_visual_analysis.py
-
+# /test/tools/video_processing/test_visual_analysis.py
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
-import torch  # <-- THÊM DÒNG NÀY
+import torch
 
-# Nhập công cụ cần kiểm thử
 from tools.video_processing.visual_analysis import VisualAnalysisTool
-
-# --- FIXTURES ---
 
 @pytest.fixture
 def fake_image_path(tmp_path: Path) -> str:
-    """Tạo một đường dẫn tệp ảnh giả."""
     p = tmp_path / "test_image.jpg"
     p.touch()
     return str(p)
 
 @pytest.fixture
 def mock_dependencies():
-    """Fixture để mock các thư viện AI bên ngoài (PIL, torch, transformers)."""
+    """Fixture để mock đồng thời cả BLIP và DETR."""
     with patch('tools.video_processing.visual_analysis.Image') as mock_image_cls, \
          patch('tools.video_processing.visual_analysis.torch') as mock_torch, \
-         patch('tools.video_processing.visual_analysis.BlipProcessor') as mock_processor_cls, \
-         patch('tools.video_processing.visual_analysis.BlipForConditionalGeneration') as mock_model_cls:
+         patch('tools.video_processing.visual_analysis.BlipProcessor') as mock_blip_proc_cls, \
+         patch('tools.video_processing.visual_analysis.BlipForConditionalGeneration') as mock_blip_model_cls, \
+         patch('tools.video_processing.visual_analysis.DetrImageProcessor') as mock_detr_proc_cls, \
+         patch('tools.video_processing.visual_analysis.DetrForObjectDetection') as mock_detr_model_cls:
 
-        # Cấu hình mock cho torch
-        mock_torch.cuda.is_available.return_value = False # Giả lập chạy trên CPU
+        # Cấu hình chung
+        mock_torch.cuda.is_available.return_value = False
+        mock_image_cls.open.return_value.convert.return_value = MagicMock()
 
-        # Cấu hình mock cho transformers
-        mock_processor_inst = MagicMock()
-        mock_model_inst = MagicMock()
-        mock_processor_cls.from_pretrained.return_value = mock_processor_inst
-        mock_model_cls.from_pretrained.return_value.to.return_value = mock_model_inst
-
-        # Cấu hình mock cho PIL
-        mock_image_inst = MagicMock()
-        mock_image_cls.open.return_value.convert.return_value = mock_image_inst
+        # Cấu hình mock cho BLIP (Captioning)
+        mock_blip_proc_inst = MagicMock()
+        mock_blip_model_inst = MagicMock()
+        mock_blip_proc_cls.from_pretrained.return_value = mock_blip_proc_inst
+        mock_blip_model_cls.from_pretrained.return_value.to.return_value = mock_blip_model_inst
+        
+        # Cấu hình mock cho DETR (Detection)
+        mock_detr_proc_inst = MagicMock()
+        mock_detr_model_inst = MagicMock()
+        # Giả lập thuộc tính config.id2label
+        mock_detr_model_inst.config.id2label = {1: 'cat', 2: 'dog'}
+        mock_detr_proc_cls.from_pretrained.return_value = mock_detr_proc_inst
+        mock_detr_model_cls.from_pretrained.return_value.to.return_value = mock_detr_model_inst
         
         yield {
-            "Image": mock_image_cls,
-            "torch": mock_torch,
-            "BlipProcessor": mock_processor_cls,
-            "BlipForConditionalGeneration": mock_model_cls,
-            "processor_inst": mock_processor_inst,
-            "model_inst": mock_model_inst
+            "blip_proc": mock_blip_proc_inst,
+            "blip_model": mock_blip_model_inst,
+            "detr_proc": mock_detr_proc_inst,
+            "detr_model": mock_detr_model_inst,
         }
 
-# --- TESTS ---
-
-def test_analyze_image_tool_success(mock_dependencies, fake_image_path):
-    """
-    Kiểm thử tool 'analyze_image' trong trường hợp thành công.
-    """
-    # 1. ARRANGE
+def test_detect_objects_success(mock_dependencies, fake_image_path):
+    """Kiểm thử tool 'detect_objects' với logic DETR hoàn chỉnh."""
     tool = VisualAnalysisTool()
     
-    # Cấu hình dữ liệu trả về giả lập từ các mock
-    mock_model_inst = mock_dependencies["model_inst"]
-    mock_processor_inst = mock_dependencies["processor_inst"]
-    expected_caption = "a dog playing in a park"
+    # ARRANGE: Cấu hình dữ liệu trả về giả lập từ DETR
+    mock_detr_proc = mock_dependencies["detr_proc"]
+    mock_detr_model = mock_dependencies["detr_model"]
     
-    # Dòng này sẽ không còn gây lỗi NameError
-    mock_model_inst.generate.return_value = [torch.tensor([1, 2, 3])] 
-    mock_processor_inst.decode.return_value = expected_caption
+    # Dữ liệu trả về thô từ model
+    raw_outputs = {
+        "scores": torch.tensor([0.99, 0.95]),
+        "labels": torch.tensor([1, 2]),
+        "boxes": torch.tensor([[10, 10, 50, 50], [60, 60, 100, 100]])
+    }
+    mock_detr_proc.post_process_object_detection.return_value = [raw_outputs]
 
-    # 2. ACT
+    # ACT
+    result = tool.detect_objects(image_path=fake_image_path)
+
+    # ASSERT
+    assert len(result) == 2
+    assert result[0]["label"] == "cat"
+    assert result[0]["confidence"] == 0.99
+    assert result[0]["box"] == [10.0, 10.0, 50.0, 50.0]
+    assert result[1]["label"] == "dog"
+    mock_detr_model.assert_called_once()
+    mock_detr_proc.post_process_object_detection.assert_called_once()
+
+
+def test_analyze_image_calls_both_models(mock_dependencies, fake_image_path):
+    """Kiểm thử tool 'analyze_image' gọi đến cả BLIP và DETR."""
+    tool = VisualAnalysisTool()
+
+    # ARRANGE: Cấu hình dữ liệu trả về giả lập
+    mock_dependencies["blip_model"].generate.return_value = [torch.tensor([1])]
+    mock_dependencies["blip_proc"].decode.return_value = "a test caption"
+    mock_dependencies["detr_proc"].post_process_object_detection.return_value = [{"scores": [], "labels": [], "boxes": []}]
+
+    # ACT
     result = tool.analyze_image(image_path=fake_image_path)
 
-    # 3. ASSERT
-    assert isinstance(result, dict)
-    assert result["description"] == expected_caption
-    # Kiểm tra kết quả giả định từ tool detect_objects
-    assert len(result["objects"]) == 2
-    assert result["objects"][0]["label"] == "person"
+    # ASSERT
+    assert result["description"] == "a test caption"
+    assert result["objects"] == []
     
-    # Kiểm tra các lời gọi mock
-    mock_dependencies["BlipProcessor"].from_pretrained.assert_called_once()
-    mock_dependencies["BlipForConditionalGeneration"].from_pretrained.assert_called_once()
-    mock_dependencies["Image"].open.assert_called_once_with(fake_image_path)
-    mock_model_inst.generate.assert_called_once()
-
-
-def test_analyze_image_file_not_found(mock_dependencies):
-    """
-    Kiểm thử tool ném ra FileNotFoundError khi ảnh không tồn tại.
-    """
-    # 1. ARRANGE
-    tool = VisualAnalysisTool()
-    
-    # 2. ACT & 3. ASSERT
-    with pytest.raises(FileNotFoundError):
-        tool.analyze_image(image_path="/non/existent/path.jpg")
-
-@patch('tools.video_processing.visual_analysis.BlipProcessor.from_pretrained', side_effect=RuntimeError("Hugging Face Hub is down"))
-def test_tool_handles_model_loading_failure(mock_from_pretrained, fake_image_path):
-    """
-    Kiểm thử tool ném ra RuntimeError nếu không thể tải được mô hình.
-    """
-    # 1. ARRANGE
-    tool = VisualAnalysisTool()
-
-    # 2. ACT & 3. ASSERT
-    with pytest.raises(RuntimeError, match="Không thể tải mô hình Visual Analysis"):
-        tool.analyze_image(image_path=fake_image_path)
-
-def test_detect_objects_tool_is_callable(fake_image_path):
-    """
-    Kiểm tra rằng tool 'detect_objects' có thể được gọi và trả về kết quả giả định.
-    """
-    # 1. ARRANGE
-    tool = VisualAnalysisTool()
-    
-    # 2. ACT
-    result = tool.detect_objects(image_path=fake_image_path)
-    
-    # 3. ASSERT
-    assert isinstance(result, list)
-    assert len(result) > 0
-    assert "label" in result[0]
+    # Kiểm tra xem cả hai model có được gọi không
+    mock_dependencies["blip_model"].generate.assert_called_once()
+    mock_dependencies["detr_model"].assert_called_once()

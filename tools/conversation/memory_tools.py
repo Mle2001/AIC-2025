@@ -3,13 +3,12 @@
 Tool để quản lý bộ nhớ dài hạn của người dùng, tuân thủ kiến trúc Agno.
 """
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 # Thư viện Agno để định nghĩa tool
 from agno.tools import tool
 
-# Giả định có các lớp để tương tác với DB
-# Chúng sẽ được mock trong các bài test.
+# Các lớp để tương tác với DB
 from database.connections.cache_db import CacheDB
 from database.connections.metadata_db import MetadataDB
 
@@ -50,25 +49,25 @@ class MemoryTool:
             preference_value (Any): Giá trị của sở thích.
 
         Returns:
-            bool: True nếu lưu thành công, False nếu ngược lại.
+            bool: True nếu lưu thành công.
         """
         if not user_id:
             raise ValueError("user_id không được để trống.")
             
         logger.info(f"Đang lưu sở thích '{preference_type}' cho người dùng: {user_id}")
         try:
-            # Dữ liệu có thể được lưu vào cả Redis (để truy cập nhanh) và Postgres (để lưu trữ lâu dài).
-            # Ví dụ: Lưu vào Redis cache
+            # Dữ liệu được lưu vào Redis cache để truy cập nhanh
             cache_key = f"user:{user_id}:preferences"
+            # Sử dụng hset để lưu từng trường trong một hash
             await self.cache.redis.hset(cache_key, preference_type, str(preference_value))
             
-            # Logic để cập nhật vào Postgres sẽ phức tạp hơn, có thể là cập nhật một trường JSON
+            # Logic để cập nhật vào Postgres (lưu trữ lâu dài)
             # await self.db.update_user_preferences(user_id, {preference_type: preference_value})
             
             return True
         except Exception as e:
             logger.error(f"Lỗi khi lưu sở thích cho người dùng '{user_id}': {e}", exc_info=True)
-            raise e
+            raise IOError(f"Không thể lưu sở thích vào cơ sở dữ liệu: {e}") from e
 
     @tool(
         name="get_user_preferences",
@@ -92,12 +91,9 @@ class MemoryTool:
         logger.info(f"Đang lấy sở thích cho người dùng: {user_id}")
         try:
             cache_key = f"user:{user_id}:preferences"
+            # hgetall đã được cấu hình để decode_responses=True trong CacheDB
             preferences = await self.cache.redis.hgetall(cache_key)
-            
-            # Chuyển đổi giá trị từ bytes sang string
-            decoded_preferences = {k.decode('utf-8'): v.decode('utf-8') for k, v in preferences.items()}
-            
-            return decoded_preferences
+            return preferences
         except Exception as e:
             logger.error(f"Lỗi khi lấy sở thích của người dùng '{user_id}': {e}", exc_info=True)
-            raise e
+            raise IOError(f"Không thể lấy sở thích từ cơ sở dữ liệu: {e}") from e

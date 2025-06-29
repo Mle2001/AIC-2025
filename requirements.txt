@@ -1,5 +1,5 @@
 # This file is compatible with 'pip install -r requirements.txt'
-# It reflects the new 2024-2025 SOTA model architecture.
+# It reflects the new 2024-2025 SOTA model architecture and legacy tools.
 
 # --- Core Frameworks ---
 agno
@@ -7,31 +7,32 @@ fastapi
 uvicorn
 pydantic
 
-# --- SOTA Models & Transformers (2024-2025 Upgrade) ---
-transformers[video]
+# --- LLM & Embedding Models ---
+openai
+anthropic
+sentence-transformers
 torch
+transformers[video]
 Pillow
-# For performance optimization
+# For performance optimization (quantization)
 bitsandbytes
 optimum
-# Use 'pip install flash-attn --no-build-isolation' for this
+# For faster attention mechanism (install separately if needed)
+# pip install flash-attn --no-build-isolation
 flash-attn
-
-# --- Specific Model Libraries (as recommended) ---
-# diffusers is for models like LTX-Video
+# For models like LTX-Video (if used for generation/enhancement)
 diffusers[torch]
-# Note: Some models like Video-LLaVA, Parakeet, Florence-2 are accessed
-# via the transformers library itself. Others might require specific packages
-# if not on Hugging Face, but we'll stick to HF for now.
+# Required by many vision models like DETR
+timm
 
-# --- Legacy & Utility Video/Audio Processing ---
+# --- Utility Video/Audio Processing ---
 # Still useful for low-level tasks like scene boundary detection
 scenedetect[opencv]
 opencv-python
 moviepy==1.0.3
-# For optimized audio loading
+# For optimized audio loading and processing
 librosa
-# For noise reduction
+# For noise reduction in audio
 noisereduce
 
 # --- Databases & Storage ---
@@ -44,5 +45,8 @@ redis[hiredis]
 # --- Testing Framework ---
 pytest
 pytest-mock
-pytest-asyncio
 pytest-cov
+pytest-asyncio
+
+#regex
+regex

@@ -1,7 +1,7 @@
 # /tools/video_processing/keyframe_extraction.py
 """
 Tool cho keyframe extraction từ các video scenes, tuân thủ kiến trúc Agno.
-
+Công cụ này được duy trì để sử dụng song song hoặc làm phương án dự phòng.
 """
 import cv2
 import logging
@@ -30,26 +30,21 @@ class KeyframeExtractionTool:
         self,
         video_path: str,
         scenes: List[Dict[str, Any]],
-        max_frames_per_scene: int = 1,
         output_dir: str = "./artifacts/keyframes"
     ) -> List[Dict[str, Any]]:
         """
-        Trích xuất các keyframe từ mỗi cảnh trong danh sách.
-        Hiện tại, công cụ này sẽ trích xuất khung hình ở chính giữa mỗi cảnh.
+        Trích xuất keyframe từ mỗi cảnh trong danh sách bằng cách lấy khung hình ở giữa.
 
         Args:
             video_path (str): Đường dẫn đến tệp video.
             scenes (List[Dict]): Danh sách các cảnh, mỗi cảnh là một dict có 'start_time' và 'end_time'.
-            max_frames_per_scene (int): Số lượng keyframe tối đa cần trích xuất cho mỗi cảnh (hiện tại chỉ hỗ trợ 1).
             output_dir (str): Thư mục để lưu các tệp ảnh keyframe.
 
         Returns:
-            List[Dict[str, Any]]: Một danh sách các dictionary, mỗi dict đại diện cho một keyframe,
-                                  chứa 'timestamp', 'image_path', và 'scene_index'.
+            List[Dict[str, Any]]: Danh sách các keyframe, chứa 'timestamp', 'image_path', và 'scene_index'.
         """
         logger.info(f"Bắt đầu trích xuất keyframes cho {len(scenes)} cảnh từ video: {video_path}")
         
-        # Đảm bảo thư mục output tồn tại
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         
         vid_cap = cv2.VideoCapture(video_path)
@@ -72,7 +67,6 @@ class KeyframeExtractionTool:
                     logger.warning(f"Bỏ qua cảnh thứ {i} vì thiếu 'start_time' hoặc 'end_time'.")
                     continue
 
-                # Chọn khung hình ở giữa cảnh
                 middle_time = start_time + (end_time - start_time) / 2
                 frame_position = int(middle_time * fps)
                 
@@ -80,12 +74,10 @@ class KeyframeExtractionTool:
                 success, frame = vid_cap.read()
 
                 if success:
-                    # Tạo đường dẫn lưu file
                     video_name = Path(video_path).stem
-                    keyframe_filename = f"{video_name}_scene_{i:03d}_time_{middle_time:.2f}.jpg"
+                    keyframe_filename = f"{video_name}_scene_{i:03d}_time_{middle_time:.2f}.jpg".replace('.', '_')
                     image_path = os.path.join(output_dir, keyframe_filename)
                     
-                    # Lưu khung hình
                     cv2.imwrite(image_path, frame)
                     
                     keyframe_data = {
@@ -108,13 +100,3 @@ class KeyframeExtractionTool:
             
         logger.info(f"Hoàn tất trích xuất, tổng cộng {len(extracted_keyframes)} keyframes.")
         return extracted_keyframes
-
-    def select_representative_frames(self, scene_frames: List, num_frames: int) -> List:
-        """
-        Hàm tiện ích nội bộ để chọn các khung hình đại diện nhất từ một cảnh.
-        Đây không phải là một 'tool' và không thể được gọi bởi agent.
-        Logic phức tạp hơn (ví dụ: phân tích độ mờ, độ tương phản) có thể được thêm vào đây.
-        """
-        # Hiện tại, chúng ta chỉ lấy khung hình ở giữa trong tool chính.
-        # Hàm này được để lại cho các cải tiến trong tương lai.
-        pass

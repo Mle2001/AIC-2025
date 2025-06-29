@@ -1,3 +1,6 @@
 __pycache__/
 .pytest_cache/
 .coverage
+errorlog.txt
+filetree.txt
+test/tools/processors/fake/
