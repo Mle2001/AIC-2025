@@ -1,25 +1,38 @@
 # This file is compatible with 'pip install -r requirements.txt'
+# It reflects the new 2024-2025 SOTA model architecture.
 
-# --- Agno Framework & Core ---
+# --- Core Frameworks ---
 agno
 fastapi
 uvicorn
 pydantic
 
-# --- LLM & Embedding Models ---
-openai
-anthropic
-sentence-transformers
+# --- SOTA Models & Transformers (2024-2025 Upgrade) ---
+transformers[video]
 torch
-transformers
 Pillow
+# For performance optimization
+bitsandbytes
+optimum
+# Use 'pip install flash-attn --no-build-isolation' for this
+flash-attn
 
-# --- Video & Audio Processing ---
-opencv-python
+# --- Specific Model Libraries (as recommended) ---
+# diffusers is for models like LTX-Video
+diffusers[torch]
+# Note: Some models like Video-LLaVA, Parakeet, Florence-2 are accessed
+# via the transformers library itself. Others might require specific packages
+# if not on Hugging Face, but we'll stick to HF for now.
+
+# --- Legacy & Utility Video/Audio Processing ---
+# Still useful for low-level tasks like scene boundary detection
 scenedetect[opencv]
-moviepy
-openai-whisper
-easyocr
+opencv-python
+moviepy==1.0.3
+# For optimized audio loading
+librosa
+# For noise reduction
+noisereduce
 
 # --- Databases & Storage ---
 lancedb
@@ -28,20 +41,8 @@ asyncpg
 sqlalchemy[asyncio]
 redis[hiredis]
 
-# --- Utilities ---
-python-multipart
-python-jose[cryptography]
-passlib[bcrypt]
-python-dotenv
-httpx
-beautifulsoup4
-requests
-
-# --- Monitoring ---
-prometheus-client
-
 # --- Testing Framework ---
 pytest
 pytest-mock
-pytest-cov
 pytest-asyncio
+pytest-cov
