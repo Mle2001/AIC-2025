@@ -5,14 +5,8 @@ import Keyframe from './Keyframe';
 import VideoPlayer from './VideoPlayer';
 
 function ChatWindow() {
-  const [messages, setMessages] = useState([
-    { from: 'user', text: 'Tìm cho tôi video về nấu phở có người thêm rau húng quế' },
-    { from: 'ai', text: 'Tôi tìm thấy 3 video về nấu phở có cảnh thêm rau húng quế. Video đầu tiên có hướng dẫn chi tiết nhất...' }
-  ]);
-  const [keyframes, setKeyframes] = useState([
-    { id: 1, label: 'Keyframe 1', time: '00:12:34', confidence: 0.95, videoUrl: '', timestamp: 754 },
-    { id: 2, label: 'Keyframe 2', time: '00:23:45', confidence: 0.92, videoUrl: '', timestamp: 1425 }
-  ]);
+  const [messages, setMessages] = useState([]);
+  const [keyframes, setKeyframes] = useState([]);
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [selectedTimestamp, setSelectedTimestamp] = useState(null);
 
@@ -25,6 +19,9 @@ function ChatWindow() {
     setSelectedVideo(keyframe.videoUrl);
     setSelectedTimestamp(keyframe.timestamp);
   };
+
+  // Lấy danh sách các input user đã nhập
+  const userInputs = messages.filter(m => m.from === 'user').map(m => m.text);
 
   return (
     <div style={{ display: 'flex', gap: 24, height: '100%' }}>
@@ -52,15 +49,16 @@ function ChatWindow() {
           <Keyframe keyframes={keyframes} onSelect={handleKeyframeClick} />
         </div>
       </div>
-      {/* Context Panel (optional) */}
+      {/* Context Panel (hiển thị input user) */}
       <div style={{ flex: 1, minWidth: 0, background: '#fff', borderRadius: 8, padding: 24, boxShadow: '0 2px 8px #f0f1f2', height: '100%', display: 'flex', flexDirection: 'column' }}>
         <h3 style={{ marginTop: 0, marginBottom: 16 }}>📄 Context Panel</h3>
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           <b>Conversation History:</b>
           <ul style={{ margin: '8px 0 16px 16px', color: '#444', fontSize: 14 }}>
-            <li>Previous queries</li>
-            <li>User context</li>
-            <li>Preferences</li>
+            {userInputs.length === 0 && <li>Chưa có input nào</li>}
+            {userInputs.map((input, idx) => (
+              <li key={idx}>{input}</li>
+            ))}
           </ul>
           <b>Suggested Questions:</b>
           <ul style={{ margin: '8px 0 0 16px', color: '#444', fontSize: 14 }}>
