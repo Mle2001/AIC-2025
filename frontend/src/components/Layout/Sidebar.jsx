@@ -1,10 +1,8 @@
-// src/components/Layout/Sidebar.jsx
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 function Sidebar() {
   const location = useLocation();
-  
   return (
     <div className="sidebar" style={{
       width: 250,
@@ -19,7 +17,6 @@ function Sidebar() {
       <div className="logo" style={{ padding: '0 20px', marginBottom: 30 }}>
         <h2>AIC 2025</h2>
       </div>
-      
       <div className="menu">
         <Link 
           to="/dashboard"
@@ -32,9 +29,8 @@ function Sidebar() {
             backgroundColor: location.pathname === '/dashboard' ? '#1890ff' : 'transparent'
           }}
         >
-          <i className="fas fa-tachometer-alt"></i> Dashboard
+          Dashboard
         </Link>
-        
         <Link 
           to="/chat"
           className={`menu-item ${location.pathname === '/chat' ? 'active' : ''}`}
@@ -46,7 +42,7 @@ function Sidebar() {
             backgroundColor: location.pathname === '/chat' ? '#1890ff' : 'transparent'
           }}
         >
-          <i className="fas fa-comments"></i> Chat
+          Chat
         </Link>
       </div>
     </div>
