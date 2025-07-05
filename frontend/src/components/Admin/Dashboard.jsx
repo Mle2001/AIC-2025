@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import VideoUpload from './VideoUpload';
 import Analytics from './Analytics';
+import VideoProcessManager from './VideoProcessManager';
 
 // Dummy data for uploaded videos
 const initialVideos = [
@@ -27,6 +28,7 @@ function Dashboard() {
   return (
     <div style={{ marginLeft: 270, padding: 32, minHeight: '100vh', background: '#f4f6f8' }}>
       <h2 style={{ marginBottom: 24 }}>Dashboard</h2>
+      {/* Quản lý video đã upload */}
       <div style={{ background: '#fff', borderRadius: 8, padding: 24, marginBottom: 32, boxShadow: '0 2px 8px #f0f1f2' }}>
         <h3>Quản lý video đã upload</h3>
         <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 16 }}>
@@ -48,9 +50,15 @@ function Dashboard() {
           </tbody>
         </table>
       </div>
+
+      {/* Bố cục 3 cột: Upload, Process, Analytics */}
       <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 320, background: '#fff', borderRadius: 8, padding: 24, boxShadow: '0 2px 8px #f0f1f2' }}>
           <VideoUpload />
+        </div>
+        <div style={{ flex: 1, minWidth: 320, background: '#fff', borderRadius: 8, padding: 24, boxShadow: '0 2px 8px #f0f1f2' }}>
+          {/* Quản lý tác vụ process video */}
+          <VideoProcessManager />
         </div>
         <div style={{ flex: 1, minWidth: 320, background: '#fff', borderRadius: 8, padding: 24, boxShadow: '0 2px 8px #f0f1f2' }}>
           <Analytics />
