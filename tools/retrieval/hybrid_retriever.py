@@ -1,148 +1,127 @@
 # /tools/retrieval/hybrid_retriever.py
 """
-Tool để thực hiện truy xuất lai (hybrid retrieval), kết hợp nhiều chiến lược,
-tuân thủ kiến trúc Agno.
+Công cụ truy xuất lai (Hybrid Retriever).
+
+Kết hợp kết quả từ nhiều nguồn truy xuất khác nhau (Vector, Graph)
+để cung cấp một danh sách kết quả cuối cùng, đã được xếp hạng và tổng hợp.
 """
 import logging
-from typing import List, Dict, Any, Optional
 import asyncio
+from typing import List, Dict, Any
 
-# Thư viện Agno để định nghĩa tool
 from agno.tools import tool
 
-# Nhập các công cụ truy xuất khác để kết hợp
-from tools.retrieval.vector_retriever import VectorRetrieverTool
-from tools.retrieval.graph_retriever import GraphRetrieverTool
+# Import các công cụ truy xuất và xử lý khác
+from .vector_retriever import VectorRetriever
+from .graph_retriever import GraphRetriever
+from ..processors.text import TextFeatureExtractor
 
-# Cấu hình logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class HybridRetrieverTool:
+class HybridRetriever:
     """
-    Một class chứa các công cụ để kết hợp các phương pháp truy xuất khác nhau
-    nhằm mang lại kết quả tốt nhất.
+    Công cụ điều phối các phương thức truy xuất khác nhau và tổng hợp kết quả.
+    Đây là công cụ chính mà RetrievalAgent sẽ sử dụng cho các truy vấn phức tạp.
     """
-    def __init__(self, vector_tool: VectorRetrieverTool, graph_tool: GraphRetrieverTool):
-        """
-        Khởi tạo tool với các instance của các công cụ truy xuất phụ thuộc.
-        Sử dụng Dependency Injection để dễ dàng kiểm thử.
 
-        Args:
-            vector_tool (VectorRetrieverTool): Instance của công cụ truy xuất vector.
-            graph_tool (GraphRetrieverTool): Instance của công cụ truy xuất đồ thị.
-        """
-        self.vector_retriever_tool = vector_tool
-        self.graph_retriever_tool = graph_tool
-        logger.info("HybridRetrieverTool đã được khởi tạo với các công cụ con.")
+    def __init__(self):
+        """Khởi tạo các retriever con và các công cụ cần thiết."""
+        self.vector_retriever = VectorRetriever()
+        self.graph_retriever = GraphRetriever()
+        self.text_embedder = TextFeatureExtractor()
+        logger.info("HybridRetriever đã được khởi tạo với các retriever con.")
 
     @tool(
-        name="multi_modal_retrieval",
-        description="Thực hiện truy xuất đa phương thức bằng cách kết hợp truy xuất vector, đồ thị và từ khóa.",
-        cache_results=False # Không cache ở cấp này, để các tool con tự cache
+        name="retrieve_comprehensive_scenes",
+        description="Thực hiện một truy vấn phức hợp, kết hợp tìm kiếm ngữ nghĩa, đồ thị và từ khóa để có kết quả toàn diện nhất."
     )
-    async def multi_modal_retrieval(
+    async def retrieve_comprehensive(
         self,
         query_text: str,
-        query_vector: List[float],
-        entities: List[Dict[str, Any]],
-        search_types: List[str] = ["vector", "graph"]
+        entities: List[str],
+        top_k: int = 10
     ) -> List[Dict[str, Any]]:
         """
-        Thực hiện truy xuất trên nhiều phương thức và hợp nhất kết quả.
+        Thực hiện truy xuất lai và tổng hợp kết quả.
 
         Args:
             query_text (str): Chuỗi truy vấn gốc của người dùng.
-            query_vector (List[float]): Vector embedding của truy vấn.
-            entities (List[Dict[str, Any]]): Danh sách các thực thể được trích xuất từ truy vấn.
-                                             Mỗi thực thể là một dict, ví dụ: {'label': 'Person', 'name': 'John'}
-            search_types (List[str]): Các loại tìm kiếm cần thực hiện.
+            entities (List[str]): Danh sách các thực thể đã được trích xuất từ truy vấn (ví dụ: ['đàn guitar', 'bãi biển']).
+            top_k (int): Số lượng kết quả cuối cùng mong muốn.
 
         Returns:
-            List[Dict[str, Any]]: Một danh sách kết quả đã được hợp nhất và xếp hạng.
+            List[Dict[str, Any]]: Danh sách kết quả cuối cùng đã được tổng hợp và xếp hạng.
         """
-        logger.info(f"Bắt đầu multi-modal retrieval cho query: '{query_text}'")
-        
-        tasks = []
-        # Chuẩn bị các tác vụ truy xuất bất đồng bộ
-        if "vector" in search_types:
-            tasks.append(self.vector_retriever_tool.hybrid_retrieval(
-                query_text=query_text,
-                query_vector=query_vector
-            ))
-        if "graph" in search_types and entities:
-            # Có thể có nhiều truy vấn đồ thị phức tạp ở đây
-            for entity in entities:
-                tasks.append(self.graph_retriever_tool.retrieve_entities_by_property(
-                    entity_label=entity.get("label", "Unknown"),
-                    properties={"name": entity.get("name")}
-                ))
+        # Bước 1: Mã hóa truy vấn văn bản thành vector
+        query_vector = self.text_embedder.get_embedding_from_text(query_text)
+        if query_vector is None:
+            logger.warning("Không thể tạo vector cho truy vấn. Bỏ qua truy xuất.")
+            return []
+        query_vector_list = query_vector.flatten().tolist()
 
-        # Chạy các tác vụ song song và thu thập kết quả
-        all_results_list = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Xử lý kết quả và lỗi
-        vector_results = []
-        graph_results = []
-        task_index = 0
-        if "vector" in search_types:
-            if not isinstance(all_results_list[task_index], Exception):
-                vector_results = all_results_list[task_index]
-            else:
-                logger.error(f"Lỗi trong vector retrieval: {all_results_list[task_index]}")
-            task_index += 1
-        
-        if "graph" in search_types and entities:
-            for _ in entities:
-                if not isinstance(all_results_list[task_index], Exception):
-                    graph_results.extend(all_results_list[task_index])
-                else:
-                     logger.error(f"Lỗi trong graph retrieval: {all_results_list[task_index]}")
-                task_index += 1
+        # Bước 2: Chuẩn bị các tác vụ truy xuất song song
+        # - Tìm kiếm ngữ nghĩa trên hình ảnh và văn bản OCR
+        # - Tìm kiếm các cảnh chứa thực thể đã biết
+        tasks = [
+            self.vector_retriever.retrieve_by_vector(query_vector_list, 'visual_embedding', top_k),
+            self.vector_retriever.retrieve_by_vector(query_vector_list, 'ocr_embedding', top_k)
+        ]
+        for entity in entities:
+            tasks.append(self.graph_retriever.find_scenes_by_entity(entity, top_k))
 
-        # Hợp nhất và xếp hạng kết quả
-        merged_results = self._rank_and_merge_results({
-            "vector": vector_results,
-            "graph": graph_results
-        })
-        logger.info(f"Hoàn tất multi-modal retrieval, trả về {len(merged_results)} kết quả.")
-        
-        return merged_results
+        results_from_all_sources = await asyncio.gather(*tasks, return_exceptions=True)
 
-    def _rank_and_merge_results(
-        self,
-        results: Dict[str, List[Dict[str, Any]]]
-    ) -> List[Dict[str, Any]]:
-        """
-        Hàm nội bộ để hợp nhất và xếp hạng kết quả từ các nguồn khác nhau.
-        """
-        final_results = {}
-        
-        # Gán điểm cho kết quả vector search dựa trên _distance
-        for res in results.get("vector", []):
-            # Giả sử mỗi kết quả có một ID duy nhất, ví dụ 'video_id' hoặc 'doc_id'
-            item_id = res.get("video_id") or res.get("id")
-            if not item_id: continue
-
-            if item_id not in final_results:
-                final_results[item_id] = {"score": 0, "sources": [], "data": res}
-            # Điểm càng cao nếu distance càng thấp. Thêm 1.0 để nhấn mạnh tầm quan trọng.
-            final_results[item_id]["score"] += 1.0 + (1.0 / (res.get("_distance", 1.0) + 0.1))
-            final_results[item_id]["sources"].append("vector")
-
-        # Cộng điểm cho kết quả từ graph search
-        for res in results.get("graph", []):
-            item_id = res.get("video_id") or res.get("id")
-            if not item_id: continue
+        # Bước 3: Tổng hợp và xếp hạng kết quả bằng Reciprocal Rank Fusion
+        valid_results = [res for res in results_from_all_sources if isinstance(res, list) and res]
+        if not valid_results:
+            logger.info("Không tìm thấy kết quả từ bất kỳ nguồn truy xuất nào.")
+            return []
             
-            if item_id not in final_results:
-                final_results[item_id] = {"score": 0, "sources": [], "data": res}
-            # Cộng một điểm cố định cho mỗi lần xuất hiện trong kết quả đồ thị
-            final_results[item_id]["score"] += 0.8 
-            final_results[item_id]["sources"].append("graph")
-            
-        # Sắp xếp kết quả dựa trên điểm số từ cao đến thấp
-        sorted_results = sorted(final_results.values(), key=lambda x: x["score"], reverse=True)
+        fused_scores = self._reciprocal_rank_fusion(valid_results)
+        sorted_scenes = sorted(fused_scores.items(), key=lambda item: item[1], reverse=True)
+
+        # Bước 4: Lấy thông tin chi tiết cho top_k scene có điểm số cao nhất
+        top_scene_ids = [scene_id for scene_id, score in sorted_scenes[:top_k]]
+        final_results = self._get_scene_details(top_scene_ids)
         
-        # Trả về dữ liệu gốc của các kết quả đã sắp xếp
-        return [item["data"] for item in sorted_results]
+        logger.info(f"Truy xuất lai hoàn tất. Trả về {len(final_results)} kết quả tổng hợp.")
+        return final_results
+
+    def _reciprocal_rank_fusion(self, search_results_lists: List[List[Dict]], k: int = 60) -> Dict[str, float]:
+        """
+        Thực hiện thuật toán Reciprocal Rank Fusion (RRF) để tổng hợp điểm số từ nhiều danh sách kết quả.
+        
+        Args:
+            search_results_lists: Một danh sách chứa nhiều danh sách kết quả.
+            k (int): Một hằng số để tránh chia cho 0.
+            
+        Returns:
+            Một dictionary với scene_id là key và điểm số RRF tổng hợp là value.
+        """
+        fused_scores: Dict[str, float] = {}
+        for result_list in search_results_lists:
+            for rank, doc in enumerate(result_list):
+                doc_id = doc.get('scene_id')
+                if doc_id:
+                    fused_scores.setdefault(doc_id, 0.0)
+                    fused_scores[doc_id] += 1.0 / (k + rank + 1)
+        return fused_scores
+
+    def _get_scene_details(self, scene_ids: List[str]) -> List[Dict[str, Any]]:
+        """Lấy thông tin chi tiết của các scene từ DB dựa trên danh sách ID."""
+        if not scene_ids:
+            return []
+        try:
+            tbl = self.vector_retriever._db_conn.open_table("scenes")
+            # Tạo một filter SQL để lấy chính xác các scene_id
+            id_filter = ", ".join([f"'{id_}'" for id_ in scene_ids])
+            results = tbl.search().where(f"scene_id IN ({id_filter})").to_list()
+            
+            # Sắp xếp lại kết quả theo đúng thứ tự của scene_ids đã được xếp hạng
+            results_map = {res['scene_id']: res for res in results}
+            sorted_results = [results_map[id_] for id_ in scene_ids if id_ in results_map]
+            return sorted_results
+        except Exception as e:
+            logger.error(f"Không thể lấy chi tiết scene: {e}", exc_info=True)
+            return [{"scene_id": id_, "error": "Could not fetch details"} for id_ in scene_ids]
+

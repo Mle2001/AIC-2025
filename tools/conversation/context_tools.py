@@ -1,84 +1,85 @@
 # /tools/conversation/context_tools.py
 """
-Tool để quản lý và truy xuất ngữ cảnh hội thoại, tuân thủ kiến trúc Agno.
+Công cụ để quản lý và phân tích ngữ cảnh của cuộc hội thoại.
 """
 import logging
-from typing import List, Dict, Any
-# ✅ SỬA LỖI: Sử dụng thư viện 'regex' thay cho 're' để hỗ trợ Unicode
-import regex
+from typing import Dict, List, Any
 
-# Thư viện Agno để định nghĩa tool
 from agno.tools import tool
 
-# Giả định có một lớp CacheDB để tương tác với Redis
-from database.connections.cache_db import CacheDB
+# Giả định rằng chúng ta có một module để kết nối tới DB,
+# nơi lưu trữ lịch sử hội thoại.
+# from database.connections import get_conversation_db_connection
 
-# Cấu hình logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 class ContextTool:
     """
-    Một class chứa các công cụ để giúp agent hiểu được ngữ cảnh của cuộc trò chuyện.
+    Công cụ giúp các Agent truy xuất và hiểu ngữ cảnh từ các lượt hội thoại trước.
     """
-    def __init__(self, cache_db: CacheDB):
-        """
-        Khởi tạo tool với một kết nối đến cache (Redis).
-        """
-        self.cache = cache_db
-        logger.info("ContextTool đã được khởi tạo với CacheDB.")
+
+    def __init__(self):
+        # self.db_conn = get_conversation_db_connection()
+        logger.info("ContextTool đã được khởi tạo.")
 
     @tool(
         name="get_conversation_history",
-        description="Lấy lịch sử của một cuộc hội thoại từ cache.",
-        cache_results=False
+        description="Lấy lịch sử của cuộc hội thoại dựa trên ID của phiên (session). Rất quan trọng để hiểu các câu hỏi nối tiếp.",
+        cache_results=False # Lịch sử hội thoại luôn cần được cập nhật mới nhất
     )
-    async def get_conversation_history(self, session_id: str, num_turns: int = 5) -> List[Dict[str, Any]]:
+    def get_conversation_history(self, session_id: str, num_turns: int = 5) -> List[Dict[str, Any]]:
         """
-        Truy xuất N lượt hội thoại cuối cùng cho một session ID nhất định.
+        Lấy N lượt hội thoại cuối cùng của một phiên.
+
+        Args:
+            session_id (str): ID định danh cho phiên hội thoại.
+            num_turns (int): Số lượng lượt hội thoại gần nhất cần lấy.
+
+        Returns:
+            List[Dict[str, Any]]: Danh sách các lượt hội thoại, mỗi lượt là một dict
+                                  chứa {'role': 'user'|'assistant', 'content': '...'}
         """
-        logger.info(f"Đang lấy {num_turns} lượt hội thoại cuối cho session: {session_id}")
-        try:
-            history = await self.cache.get_chat_history(session_id, limit=num_turns)
-            history.reverse()
-            return history
-        except Exception as e:
-            logger.error(f"Lỗi khi lấy lịch sử hội thoại cho session '{session_id}': {e}", exc_info=True)
-            raise e
+        logger.info(f"Đang truy xuất {num_turns} lượt hội thoại cuối cho session_id: {session_id}")
+        # --- LOGIC THỰC TẾ ---
+        # Tại đây sẽ là code để truy vấn vào Redis hoặc PostgreSQL
+        # để lấy lịch sử hội thoại đã được lưu.
+        # Ví dụ:
+        # history = self.db_conn.query(
+        #     "SELECT role, content FROM conversations WHERE session_id = ? ORDER BY timestamp DESC LIMIT ?",
+        #     (session_id, num_turns)
+        # )
+        # return history
+
+        # --- DỮ LIỆU GIẢ LẬP ĐỂ TEST ---
+        mock_history = [
+            {"role": "user", "content": "Tìm cho tôi các video về nấu ăn."},
+            {"role": "assistant", "content": "Tôi tìm thấy 5 video về nấu ăn. Bạn có muốn xem video về món Âu hay Á?"},
+            {"role": "user", "content": "Món Âu đi."},
+        ]
+        return mock_history[-num_turns:] if num_turns < len(mock_history) else mock_history
 
     @tool(
-        name="extract_context_entities",
-        description="Trích xuất các thực thể quan trọng từ lịch sử hội thoại.",
-        cache_results=True,
-        cache_ttl=300
+        name="summarize_context",
+        description="Tóm tắt các điểm chính và các thực thể quan trọng từ lịch sử hội thoại để làm đầu vào cho các truy vấn phức tạp."
     )
-    def extract_context_entities(self, conversation_history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def summarize_context(self, conversation_history: List[Dict[str, Any]]) -> str:
         """
-        Phân tích lịch sử hội thoại để tìm các thực thể đã được đề cập trước đó.
-        """
-        logger.info(f"Đang trích xuất thực thể từ {len(conversation_history)} lượt hội thoại.")
-        
-        entities = []
-        # ✅ SỬA LỖI: Regex này tìm các cụm từ có ít nhất một từ viết hoa,
-        # và ưu tiên các cụm có nhiều từ. Nó cũng xử lý tiếng Việt có dấu.
-        proper_noun_regex = r'\b\p{Lu}\p{L}*(?:\s+\p{Lu}\p{L}*)*\b'
-        
-        for turn in conversation_history:
-            message = turn.get("message", "")
-            if turn.get("role") == "user":
-                # Tìm các cụm danh từ riêng
-                found_proper_nouns = regex.findall(proper_noun_regex, message)
-                for phrase in found_proper_nouns:
-                    # Lọc bỏ các từ đơn đứng đầu câu không phải là danh từ riêng thực sự
-                    if ' ' in phrase or phrase not in ["Hãy", "Tôi", "Thời"]:
-                        if not any(e['name'].lower() == phrase.lower() for e in entities):
-                            entities.append({"name": phrase, "type": "PROPER_NOUN"})
-                
-                # Tìm các cụm từ trong dấu ngoặc kép
-                found_quoted = regex.findall(r'["\'](.*?)["\']', message)
-                for phrase in found_quoted:
-                     if not any(e['name'].lower() == phrase.lower() for e in entities):
-                        entities.append({"name": phrase, "type": "QUOTED_PHRASE"})
+        Tóm tắt một đoạn hội thoại.
 
-        logger.info(f"Đã trích xuất được {len(entities)} thực thể từ ngữ cảnh.")
-        return entities
+        Args:
+            conversation_history (List[Dict[str, Any]]): Lịch sử hội thoại cần tóm tắt.
+
+        Returns:
+            str: Một chuỗi văn bản tóm tắt các ý chính.
+        """
+        if not conversation_history:
+            return "Không có lịch sử hội thoại."
+
+        # Có thể dùng một LLM nhỏ để tóm tắt, hoặc đơn giản là nối chuỗi
+        summary = "Tóm tắt hội thoại: "
+        for turn in conversation_history:
+            summary += f"{turn['role'].capitalize()}: {turn['content']}. "
+        
+        logger.info(f"Đã tóm tắt hội thoại thành: '{summary[:100]}...'")
+        return summary
+
