@@ -1,11 +1,12 @@
 // src/components/Admin/VideoUpload.jsx
 import React, { useRef, useState } from 'react';
+import { useVideo } from '../../hook/useVideo';
 
 function VideoUpload() {
   const [selectedFiles, setSelectedFiles] = useState([]);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
   const inputRef = useRef();
+  // Hook quản lý video
+  const { uploadVideo, videos, isLoading, error, reloadVideos } = useVideo();
 
   const handleFileChange = (e) => {
     setSelectedFiles(Array.from(e.target.files));
@@ -13,43 +14,10 @@ function VideoUpload() {
 
   const handleUpload = async () => {
     if (!selectedFiles.length) return;
-    setUploading(true);
-    setProgress(0);
-    
-    const formData = new FormData();
-    selectedFiles.forEach(file => formData.append('videos', file));
-
-    try {
-      const xhr = new XMLHttpRequest();
-      xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable) {
-          const percentComplete = (event.loaded / event.total) * 100;
-          setProgress(Math.round(percentComplete));
-        }
-      });
-
-      xhr.onload = () => {
-        if (xhr.status === 200) {
-          alert('Upload successful!');
-          setSelectedFiles([]);
-          inputRef.current.value = '';
-        } else {
-          alert('Upload failed!');
-        }
-        setUploading(false);
-      };
-
-      xhr.onerror = () => {
-        alert('Upload failed!');
-        setUploading(false);
-      };
-
-      xhr.open('POST', '/api/upload/videos');
-      xhr.send(formData);
-    } catch (error) {
-      console.error('Upload error:', error);
-      setUploading(false);
-    }
+    // Upload từng file qua useVideo
+    selectedFiles.forEach(file => uploadVideo(file));
+    setSelectedFiles([]);
+    inputRef.current.value = '';
   };
 
   return (
@@ -89,40 +57,29 @@ function VideoUpload() {
         </div>
       )}
 
-      {uploading && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ 
-            width: '100%', 
-            height: 8, 
-            backgroundColor: '#f0f0f0',
-            borderRadius: 4,
-            overflow: 'hidden'
-          }}>
-            <div style={{
-              width: `${progress}%`,
-              height: '100%',
-              backgroundColor: '#1890ff',
-              transition: 'width 0.3s'
-            }} />
-          </div>
-          <p>{progress}% Uploaded</p>
-        </div>
-      )}
-
+      {isLoading && <div>Đang tải danh sách video...</div>}
+      {error && <div style={{color:'red'}}>{error}</div>}
       <button 
         onClick={handleUpload} 
-        disabled={uploading || !selectedFiles.length}
+        disabled={isLoading || !selectedFiles.length}
         style={{
           padding: '8px 16px',
-          backgroundColor: uploading || !selectedFiles.length ? '#d9d9d9' : '#1890ff',
+          backgroundColor: isLoading || !selectedFiles.length ? '#d9d9d9' : '#1890ff',
           color: 'white',
           border: 'none',
           borderRadius: 4,
-          cursor: uploading || !selectedFiles.length ? 'not-allowed' : 'pointer'
+          cursor: isLoading || !selectedFiles.length ? 'not-allowed' : 'pointer'
         }}
       >
-        {uploading ? 'Uploading...' : 'Start Upload'}
+        {isLoading ? 'Uploading...' : 'Start Upload'}
       </button>
+
+      <h4 style={{marginTop:24}}>Danh sách video đã upload:</h4>
+      <ul>
+        {videos && videos.length === 0 && <li>Chưa có video nào</li>}
+        {videos && videos.map(v => <li key={v.id || v.name}>{v.name || v.filename}</li>)}
+      </ul>
+      <button onClick={reloadVideos} style={{marginTop:8}}>Reload</button>
     </div>
   );
 }
