@@ -116,6 +116,11 @@ class ContextAnalysis(BaseModel):
     status: str = Field(..., description="Analysis status")
 
 class ContextManagerAgent(ConversationalAgent):
+    def process(self, *args, **kwargs):
+        """
+        Dummy implementation to satisfy abstract base class.
+        """
+        raise NotImplementedError("Use update_context() or analyze_context() instead of process().")
     """
     Agent chuyên quản lý conversation context và memory
     Track conversation state, user preferences, session management

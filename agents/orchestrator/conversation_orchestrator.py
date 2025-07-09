@@ -90,6 +90,11 @@ class ConversationConfig(BaseModel):
     max_response_time: int = Field(default=10, description="Max total response time (seconds)")
 
 class ConversationOrchestrator(ConversationalAgent):
+    def process(self, *args, **kwargs):
+        """
+        Dummy implementation to satisfy abstract base class.
+        """
+        raise NotImplementedError("Use process_conversation() instead of process().")
     """
     Orchestrator điều phối conversation flow trong competition phase
     Coordinate tất cả conversational agents để xử lý user queries

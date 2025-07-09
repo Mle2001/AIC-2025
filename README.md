@@ -16,7 +16,7 @@ If you are developing a production application, we recommend using TypeScript wi
 Chạy lệnh sau ở thư mục gốc dự án:
 
 ```
-uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
+python -m uvicorn api.main:app --reload --host 127.0.0.1 --port 8000  
 ```
 
 Sau đó truy cập http://localhost:8000 để kiểm tra backend đã hoạt động.
