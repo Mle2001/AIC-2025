@@ -4,3 +4,4 @@ __pycache__/
 errorlog.txt
 filetree.txt
 test/tools/processors/fake/
+.venv/
