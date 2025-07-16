@@ -6,6 +6,14 @@ from starlette.requests import Request
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import os
 from api.routers import chat, upload, admin, health
+try:
+    from api.routers import frame_processor
+    FRAME_PROCESSOR_AVAILABLE = True
+except ImportError as e:
+    FRAME_PROCESSOR_AVAILABLE = False
+    print(f"Frame processor not available: {e}")
+
+from api.config import settings, validate_settings
 
 # Middleware setup function
 def setup_middleware(app: FastAPI):
@@ -24,10 +32,20 @@ def setup_routes(app: FastAPI):
     app.include_router(upload.router, prefix="/api/upload")
     app.include_router(admin.router, prefix="/api/admin")
     app.include_router(health.router, prefix="/api/health")
+    
+    # Only include frame processor if available
+    if FRAME_PROCESSOR_AVAILABLE:
+        app.include_router(frame_processor.router)  # Already has prefix in router
+    else:
+        print("Frame processor router not available - skipping")
 
 # Factory function tạo FastAPI app
 def create_app() -> FastAPI:
-    app = FastAPI(title="Agno AI Backend")
+    app = FastAPI(
+        title="AIC-2025 VideoRAG System",
+        description="AI-powered video interaction system with VideoRAG",
+        version="1.0.0"
+    )
     setup_middleware(app)
     setup_routes(app)
     # Sử dụng static folder là build/dist của frontend

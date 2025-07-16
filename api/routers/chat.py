@@ -17,6 +17,17 @@ async def send_message(request: ChatRequest, user=Depends(get_current_user)):
     response = await chat_service.process_message(request, user)
     return ChatResponse(**response)
 
+@router.get("/videos")
+async def get_user_videos(user=Depends(get_current_user)):
+    """
+    Lấy danh sách video của user để hiển thị trong chat sidebar
+    """
+    try:
+        videos = await chat_service.get_video_list(user)
+        return {"videos": videos, "total": len(videos)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     await websocket.accept()

@@ -29,7 +29,7 @@ function Sidebar() {
             backgroundColor: location.pathname === '/dashboard' ? '#1890ff' : 'transparent'
           }}
         >
-          Dashboard
+          📊 Dashboard
         </Link>
         <Link 
           to="/chat"
@@ -42,7 +42,20 @@ function Sidebar() {
             backgroundColor: location.pathname === '/chat' ? '#1890ff' : 'transparent'
           }}
         >
-          Chat
+          💬 Chat
+        </Link>
+        <Link 
+          to="/videorag"
+          className={`menu-item ${location.pathname === '/videorag' ? 'active' : ''}`}
+          style={{
+            display: 'block',
+            padding: '15px 20px',
+            color: 'white',
+            textDecoration: 'none',
+            backgroundColor: location.pathname === '/videorag' ? '#1890ff' : 'transparent'
+          }}
+        >
+          🎬 VideoRAG
         </Link>
       </div>
     </div>

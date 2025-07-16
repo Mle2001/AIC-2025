@@ -1,0 +1,15 @@
+Video Name:d0a17173-85bc-4024-83f5-504148fa630e Error processing:
+Error in segment_caption:
+ Repo id must use alphanumeric chars or '-', '_', '.', '--' and '..' are forbidden, '-' and '.' cannot start or end the name, max length is 96: './MiniCPM-V-2_6-int4'.
+
+Video Name:bbb6b358-1d0d-4a63-8581-63249e1baf71 Error processing:
+Error in segment_caption:
+ No package metadata was found for bitsandbytes
+
+Video Name:342f9a7f-e849-4a0d-bd87-7c7094332367 Error processing:
+Error loading MiniCPM model: cannot import name 'validate_bnb_backend_availability' from 'transformers.integrations' (C:\Users\giang\AppData\Roaming\Python\Python310\site-packages\transformers\integrations\__init__.py)
+
+Video Name:e029a9d3-92d9-40ec-b4cb-4b208d685adf Error processing:
+Error in segment_caption:
+ local variable 'os' referenced before assignment
+

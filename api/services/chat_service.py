@@ -1,29 +1,72 @@
-from agents.orchestrator.conversation_orchestrator import ConversationOrchestrator
-#from database.models.user_session import UserSession
-#from database.models.conversation import Conversation
 from api.models.chat_models import ChatRequest
-from typing import AsyncGenerator
+from api.services.video_service import VideoService
+from api.config import get_openai_api_key, settings
+from typing import AsyncGenerator, List, Dict, Any
 import asyncio
 import uuid
 import os
 import requests
+import json
+import logging
 
 # Placeholder for chat service
 class ChatService:
     def __init__(self):
-        self.orchestrator = ConversationOrchestrator()
+        # Loại bỏ orchestrator vì không còn sử dụng agents
+        self.session_data = {}
+        self.video_service = VideoService()
 
-    async def process_message(self, request: ChatRequest, user_id: str):
-        # Nếu có openai_api_key thì gọi OpenAI API, nếu không thì trả về demo
-        if request.openai_api_key:
+    async def process_message(self, request: ChatRequest, user_id: str) -> Dict[str, Any]:
+        # Sử dụng API key từ config nếu không có trong request
+        api_key = request.openai_api_key or get_openai_api_key()
+        
+        # Kiểm tra nếu có video_id trong request để query video
+        if hasattr(request, 'video_id') and request.video_id:
+            try:
+                # Query video với VideoRAG
+                video_result = await self.video_service.query_video(
+                    request.video_id, 
+                    request.message, 
+                    api_key
+                )
+                
+                # Lấy thông tin video để trả về
+                video_info = await self.video_service.get_video_info(request.video_id)
+                
+                return {
+                    "response": video_result["response"],
+                    "videos": [{
+                        "id": request.video_id, 
+                        "query": request.message,
+                        "name": video_info.get("original_name", "Unknown"),
+                        "status": video_info.get("status", "unknown")
+                    }],
+                    "session_id": request.session_id or str(uuid.uuid4()),
+                    "model": request.model or settings.openai_model,
+                    "usage": None,
+                    "source": "videorag"
+                }
+            except Exception as e:
+                logging.error(f"VideoRAG error: {e}")
+                return {
+                    "response": f"VideoRAG error: {str(e)}",
+                    "videos": [],
+                    "session_id": request.session_id or str(uuid.uuid4()),
+                    "model": request.model or settings.openai_model,
+                    "usage": None,
+                    "source": "error"
+                }
+        
+        # Nếu có API key thì gọi OpenAI API
+        if api_key:
             # Ví dụ gọi OpenAI Chat Completion API
             openai_url = "https://api.openai.com/v1/chat/completions"
             headers = {
-                "Authorization": f"Bearer {request.openai_api_key}",
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json"
             }
             payload = {
-                "model": request.model or "gpt-3.5-turbo",
+                "model": request.model or settings.openai_model,
                 "messages": [{"role": "user", "content": request.message}],
                 "temperature": request.temperature or 0.7
             }
@@ -37,24 +80,38 @@ class ChatService:
                     "response": ai_message,
                     "videos": [],
                     "session_id": request.session_id or str(uuid.uuid4()),
-                    "model": request.model,
-                    "usage": usage
+                    "model": request.model or settings.openai_model,
+                    "usage": usage,
+                    "source": "openai"
                 }
             except Exception as e:
+                logging.error(f"OpenAI API error: {e}")
                 return {
                     "response": f"OpenAI API error: {str(e)}",
                     "videos": [],
                     "session_id": request.session_id or str(uuid.uuid4()),
-                    "model": request.model,
-                    "usage": None
+                    "model": request.model or settings.openai_model,
+                    "usage": None,
+                    "source": "error"
                 }
+        
+        # Fallback demo response
         return {
-            "response": f"Demo AI response for user {user_id}",
+            "response": f"Demo AI response for user {user_id}. Please configure OpenAI API key in backend.",
             "videos": [],
             "session_id": getattr(request, 'session_id', str(uuid.uuid4())),
-            "model": request.model,
-            "usage": None
+            "model": request.model or settings.openai_model,
+            "usage": None,
+            "source": "demo"
         }
+
+    async def get_video_list(self, user_id: str) -> List[Dict[str, Any]]:
+        """Lấy danh sách video của user"""
+        try:
+            return await self.video_service.list_videos(user_id)
+        except Exception as e:
+            logging.error(f"Error getting video list: {e}")
+            return []
 
     async def stream_response(self, request, user_id: str) -> AsyncGenerator[str, None]:
         # Dummy streaming generator

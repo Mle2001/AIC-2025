@@ -8,6 +8,7 @@ class ChatRequest(BaseModel):
     model: Optional[str] = "grok-1"
     temperature: Optional[float] = 0.7
     openai_api_key: Optional[str] = None  # Thêm trường cho OpenAI API key (nếu cần truyền động)
+    video_id: Optional[str] = None  # Thêm trường cho video query
 
 class ChatResponse(BaseModel):
     response: str
@@ -15,3 +16,4 @@ class ChatResponse(BaseModel):
     session_id: str
     model: Optional[str] = None
     usage: Optional[dict] = None
+    source: Optional[str] = None  # Thêm trường để biết nguồn response (openai, videorag, demo)
