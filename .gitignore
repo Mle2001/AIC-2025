@@ -103,3 +103,8 @@ VideoRAG/MiniCPM-V-2_6-int4/
 VideoRAG/ImageBind/
 VideoRAG/longervideos/
 VideoRAG/checkpoints/
+VideoRAG/.checkpoints/
+
+# Ignore egg-info files
+*.egg-info/
+**/egg-info/
