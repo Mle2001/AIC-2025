@@ -108,3 +108,4 @@ VideoRAG/.checkpoints/
 # Ignore egg-info files
 *.egg-info/
 **/egg-info/
+
