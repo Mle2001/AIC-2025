@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { chatAPI } from '../services/api';
 import { useWebSocket } from './useWebSocket';
-import { useAuth } from './useAuth';
 
 /**
  * useChat - Custom hook quản lý toàn bộ logic chat, WebSocket, message history, optimistic update, error recovery
@@ -10,8 +9,7 @@ import { useAuth } from './useAuth';
  * @returns {object} { messages, sendMessage, isLoading, error, connectionStatus, isTyping, loadHistory }
  */
 export function useChat(sessionId) {
-  const { user } = useAuth();
-  const userId = user?.id || 'user1';
+  const userId = 'user1';
   const [messages, setMessages] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');

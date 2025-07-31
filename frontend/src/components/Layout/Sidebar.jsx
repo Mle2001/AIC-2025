@@ -44,19 +44,6 @@ function Sidebar() {
         >
           💬 Chat
         </Link>
-        <Link 
-          to="/videorag"
-          className={`menu-item ${location.pathname === '/videorag' ? 'active' : ''}`}
-          style={{
-            display: 'block',
-            padding: '15px 20px',
-            color: 'white',
-            textDecoration: 'none',
-            backgroundColor: location.pathname === '/videorag' ? '#1890ff' : 'transparent'
-          }}
-        >
-          🎬 VideoRAG
-        </Link>
       </div>
     </div>
   );

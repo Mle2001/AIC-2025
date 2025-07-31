@@ -1,8 +1,8 @@
 // api.js - API client để interact với AI agents
 import axios from 'axios';
 
-// Configure base URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+// Configure base URL từ biến môi trường Vite
+const API_BASE_URL = `http://${import.meta.env.VITE_BACKEND_HOST || 'localhost'}:${import.meta.env.VITE_BACKEND_PORT || '8000'}`;
 
 // Create axios instance với default config
 const apiClient = axios.create({
